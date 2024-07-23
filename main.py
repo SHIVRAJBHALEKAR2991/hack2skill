@@ -5,20 +5,17 @@ import geopandas as gpd
 from shapely.geometry import Polygon
 
 # Load the model
-model = YOLO("crater.pt")
-
-# Define class names (only one class in your case)
-classnames = ['Crater']
+model = YOLO('yolov10_v1.0/best (3).pt')
 
 # Read the image
 img = cv.imread('base_file/valid/images/81_jpg.rf.bc6161b584b180ffbbb3829a0599e23f.jpg')
-cv.imshow('original',img)
 
 # Advanced pre-processing
 gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
-blurred = cv.GaussianBlur(gray, (5, 5), 0)
-equalized = cv.equalizeHist(blurred)
-edges = cv.Canny(equalized, 50, 150)
+clahe = cv.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+equalized = clahe.apply(gray)
+blurred = cv.GaussianBlur(equalized, (5, 5), 0)
+edges = cv.Canny(blurred, 50, 150)
 binary = cv.adaptiveThreshold(equalized, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 11, 2)
 
 # Morphological operations
@@ -28,10 +25,8 @@ morph = cv.morphologyEx(binary, cv.MORPH_CLOSE, kernel)
 # Run inference
 results = model(img, stream=True)
 
-# Metadata for selenographic conversion (assumed values)
-# Scale: pixels per km (assuming 1 pixel = 100 meters for this example)
+# Metadata for selenographic conversion
 scale = 0.1  # 1 pixel = 100 meters
-# Center coordinates of the image in selenographic coordinates (latitude, longitude)
 center_lat, center_lon = 0.0, 0.0
 
 # Function to convert pixel coordinates to selenographic coordinates
@@ -39,6 +34,10 @@ def pixel_to_selenographic(x, y, center_lat, center_lon, scale):
     lon = center_lon + (x - img.shape[1] / 2) * scale / 1000.0
     lat = center_lat - (y - img.shape[0] / 2) * scale / 1000.0
     return lat, lon
+def calculate_diameter(width, height, scale):
+    diameter = (width**2 + height**2) / 2
+    diameter = (diameter**0.5) * scale
+    return diameter
 
 # List to hold all polygons and their properties
 crater_data = []
@@ -75,28 +74,26 @@ for r in results:
                 # Calculate the diameter (using the bounding box of the contour)
                 rect = cv.minAreaRect(approx)
                 width, height = rect[1]
-                diameter = max(width, height) * scale / 1000.0  # Convert to km
+                # diameter = max(width, height) * scale  /1000 # Convert to km
+                diameter = calculate_diameter(width,height,scale) / 1000
                 crater_data[-1]['diameter_km'] = diameter
-                crater_data[-1]['width'] = width
-                crater_data[-1]['height'] = height
 
-                # Draw the contour on the image
-                cv.drawContours(img, [approx], -1, (0, 0, 255), 2)
+                # Calculate and print the center
+                M = cv.moments(contour)
+                if M["m00"] != 0:
+                    cx = int(M["m10"] / M["m00"])
+                    cy = int(M["m01"] / M["m00"])
+                    center_lat_lon = pixel_to_selenographic(cx, cy, center_lat, center_lon, scale)
+                    print(f"Crater ID: {crater_id}, Center: Latitude: {center_lat_lon[0]:.6f}, Longitude: {center_lat_lon[1]:.6f}")
 
-                # Annotate the diameter on the image
-                center = (int(rect[0][0]), int(rect[0][1]))
-                cv.putText(img, f'{crater_id}', center, cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
-
-                # Print the crater ID, width, and height
-                print(f"Crater ID: {crater_id}, Width: {width}, Height: {height}")
+                # Print diameter
+                print(f"Estimated Diameter (km): {diameter:.9f}")
 
                 # Increment crater ID
                 crater_id += 1
 
-# Show the image with detections
-cv.imshow('detections', img)
-cv.waitKey(0)
-cv.destroyAllWindows()
+# Save detections
+cv.imwrite('detections.jpg', img)
 
 # Create a GeoDataFrame
 # gdf = gpd.GeoDataFrame(crater_data)
