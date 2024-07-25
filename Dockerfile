@@ -7,4 +7,4 @@ RUN python -m venv venv
 RUN . venv/bin/activate && pip install --no-cache-dir -r requirements.txt
 RUN . venv/bin/activate && python train.py
 
-CMD ["sh", "-c", ". venv/bin/activate && python main.py"]
+CMD ["sh", "-c", ". venv/bin/activate && python main.py"]   
