@@ -1,9 +1,4 @@
 # ISRO Hackathon
-
-## Overview
-
-This project is designed to [briefly describe what your project does].
-
 ## Repository Structure
 
 - `base_file/`: Directory containing data files.
