@@ -5,3 +5,4 @@ NumPy==1.24.1
 geopandas==1.0.1
 shapely==2.0.1
 torch
+torchvision
