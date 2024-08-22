@@ -1,4 +1,3 @@
-# ISRO Hackathon
 ## Repository Structure
 
 - `base_file/`: Directory containing data files.
